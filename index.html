@@ -1541,7 +1541,8 @@ async function handleOutbound(modelEnc,storageEnc,btn){
       p_unit: base?.unit||"PCS",
       p_location: base?.location||"",
       p_material: base?.material||"",
-      p_comments: comments||`Recipient:${recipient}`
+      p_comments: comments||"",
+      p_recipient: recipient||""
     });
     if(error) throw new Error(error.message||"出库失败");
 
