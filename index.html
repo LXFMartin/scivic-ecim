@@ -2041,14 +2041,11 @@ function renderLogsTable(rows){
         <td class="px-4 py-3">${safe(r.name||"")}</td>
         <td class="px-4 py-3">${safe(r.unit||"PCS")}</td>
         <td class="px-4 py-3">${safe(r.quantity||r.qty||"")}</td>
-        <td class="px-4 py-3">${
+        <td class="px-4 py-3 style="min-width:90px;max-width:120px;word-break:break-all;">${
           r.type==="TRANSFER"
           ? `${safe(r.from_storage)} → ${safe(r.to_storage)}`
           : safe(r.storage||"")
         }</td>
-        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[50px] max-w-[80px]">${safe(r.storage||"")}</td>
-        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[50px] max-w-[80px]">${safe(r.from||"")}</td>
-        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[50px] max-w-[80px]">${safe(r.to||"")}</td>
         <td class="px-4 py-3">${safe(r.operator||"")}</td>
         <td class="px-4 py-3">${safe(r.comments||"")}</td>
       </tr>
@@ -2131,4 +2128,5 @@ function exportLogsCSV(){
 
 </body>
 </html>
+
 
