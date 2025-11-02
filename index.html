@@ -2038,7 +2038,7 @@ function renderLogsTable(rows){
         <td class="px-4 py-3">${formatLocalTime(r.ts)}</td>
         <td class="px-4 py-3">${safe(r.type||"")}</td>
         <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[80px] max-w-[150px]">${safe(r.model||"")}</td>
-        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[80px] max-w-[150px]">${safe(r.name||"")}</td>
+        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[80px] max-w-[120px]">${safe(r.name||"")}</td>
         <td class="px-4 py-3">${safe(r.unit||"PCS")}</td>
         <td class="px-4 py-3">${safe(r.quantity||r.qty||"")}</td>
         <td class="px-4 py-3" style="min-width:30px;max-width:60px;word-break:break-all;">${
