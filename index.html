@@ -1944,7 +1944,7 @@ async function handleBatchTransfer(evt){
   });
 }
 
-* ========= 17. 日志（合并 inbound / outbound / transfer） =========
+/* ========= 17. 日志（合并 inbound / outbound / transfer） =========
    自动汇总三类操作记录作为日志，无需 logs 表
 */
 let logsAllRows = [];
@@ -2037,15 +2037,22 @@ function renderLogsTable(rows){
       <tr class="hover:bg-gray-50">
         <td class="px-4 py-3">${formatLocalTime(r.ts)}</td>
         <td class="px-4 py-3">${safe(r.type||"")}</td>
-        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[100px] max-w-[200px]">${safe(r.model||"")}</td>
-        <td class="px-4 py-3">${safe(r.name||"")}</td>
+        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[80px] max-w-[150px]">${safe(r.model||"")}</td>
+        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[80px] max-w-[120px]">${safe(r.name||"")}</td>
         <td class="px-4 py-3">${safe(r.unit||"PCS")}</td>
         <td class="px-4 py-3">${safe(r.quantity||r.qty||"")}</td>
-        <td class="px-4 py-3">${
+        <td class="px-4 py-3" style="min-width:30px;max-width:60px;word-break:break-all;">${
           r.type==="TRANSFER"
           ? `${safe(r.from_storage)} → ${safe(r.to_storage)}`
           : safe(r.storage||"")
         }</td>
+        <td class="px-4 py-3" style="min-width:30px;max-width:60px;word-break:break-all;">
+      ${safe(r.from_storage||"")}
+     </td>
+     <td class="px-4 py-3" style="min-width:30px;max-width:60px;word-break:break-all;">
+      ${safe(r.to_storage||"")}
+    </td>    
+        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[30px] max-w-[80px]">${safe(r.recipient||"")}</td>
         <td class="px-4 py-3">${safe(r.operator||"")}</td>
         <td class="px-4 py-3">${safe(r.comments||"")}</td>
       </tr>
