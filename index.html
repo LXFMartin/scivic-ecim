@@ -1982,6 +1982,12 @@ async function reloadLogs() {
 
 // 筛选 + 搜索
 function applyLogsFilter() {
+  console.log("🧭 进入 applyLogsFilter");
+  console.log("类型:", byId("logs-type").value);
+  console.log("搜索:", byId("logs-search").value);
+  console.log("开始日期:", byId("logs-date-start").value);
+  console.log("结束日期:", byId("logs-date-end").value);
+  console.log("总记录数:", _logsCache.length);
   const qRaw = (byId("logs-search").value || "").trim();
   const q = qRaw.toLowerCase();
   const type = (byId("logs-type").value || "ALL").toUpperCase();
@@ -2015,7 +2021,7 @@ function applyLogsFilter() {
       return combined.includes(q);
     });
   }
-
+  console.log("筛选后记录数:", filtered.length);
   renderLogsTable(rows, qRaw);
 }
 
@@ -2102,6 +2108,7 @@ function exportLogsCSV() {
 
 </body>
 </html>
+
 
 
 
