@@ -1945,91 +1945,87 @@ async function handleBatchTransfer(evt){
   });
 }
 
-/* ========= 17. 日志（合并 inbound / outbound / transfer） =========
-   自动汇总三类操作记录作为日志，无需 logs 表
-*/
-let logsAllRows = [];
+/* ========= 17. 操作日志（log_all + 模糊搜索高亮版） ========= */
+let _logsCache = [];
 let _logsLoadedOnce = false;
 
+// 读取 log_all 表
 async function reloadLogs() {
   const btn = byId("btn-logs-refresh");
-  const old = btn ? btn.innerHTML : "";
+  const oldHTML = btn ? btn.innerHTML : "";
   if (btn) {
     btn.classList.add("disabled");
     btn.innerHTML = "⏳";
   }
 
   try {
-    // 并行加载三张表
-    const [inRes, outRes, trRes] = await Promise.all([
-      supa.from("inbound").select("created_at,model,name,unit,quantity,storage,operator,comments").order("created_at",{ascending:false}).limit(10000),
-      supa.from("outbound").select("created_at,model,name,unit,quantity,storage,recipient,operator,comments").order("created_at",{ascending:false}).limit(10000),
-      supa.from("transfer").select("created_at,model,name,unit,quantity,from_storage,to_storage,operator,comments").order("created_at",{ascending:false}).limit(1000)
-    ]);
+    const { data, error } = await supa
+      .from("log_all")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-    const all = [];
-    if (inRes.data) for (const r of inRes.data) all.push({ type:"INBOUND", ts:r.created_at, ...r });
-    if (outRes.data) for (const r of outRes.data) all.push({ type:"OUTBOUND", ts:r.created_at, ...r });
-    if (trRes.data) for (const r of trRes.data) all.push({ type:"TRANSFER", ts:r.created_at, ...r });
-
-    logsAllRows = all.sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+    if (error) throw error;
+    _logsCache = data || [];
     _logsLoadedOnce = true;
-
     applyLogsFilter();
 
-  } catch(err) {
+  } catch (err) {
     console.error("日志加载失败：", err);
-    showNotification(LANG==='en'?"Failed to load logs":"日志加载失败","error");
+    showNotification("日志加载失败：" + err.message, "error");
   }
 
   if (btn) {
     btn.classList.remove("disabled");
-    btn.innerHTML = old;
+    btn.innerHTML = oldHTML;
   }
 }
 
-/* ========= 日志过滤 + 高亮渲染增强版 ========= */
-function applyLogsFilter(){
+// 筛选 + 搜索
+function applyLogsFilter() {
   const qRaw = (byId("logs-search").value || "").trim();
   const q = qRaw.toLowerCase();
-  const typ = (byId("logs-type").value || "ALL").toUpperCase();
+  const type = (byId("logs-type").value || "ALL").toUpperCase();
   const startDate = byId("logs-date-start").value;
   const endDate = byId("logs-date-end").value;
-  let rows = logsAllRows.slice();
 
-  if(typ && typ!=="ALL"){
-    rows = rows.filter(r => (r.type || "").toUpperCase() === typ);
+  let rows = (_logsCache || []).slice();
+
+  // 类型筛选
+  if (type && type !== "ALL") {
+    rows = rows.filter(r => (r.type || "").toUpperCase() === type);
   }
 
-  if(startDate){
+  // 日期范围筛选
+  if (startDate) {
     const startTs = new Date(startDate + "T00:00:00Z").getTime();
-    rows = rows.filter(r => new Date(r.ts || r.time || 0).getTime() >= startTs);
+    rows = rows.filter(r => new Date(r.created_at).getTime() >= startTs);
   }
-  if(endDate){
+  if (endDate) {
     const endTs = new Date(endDate + "T23:59:59Z").getTime();
-    rows = rows.filter(r => new Date(r.ts || r.time || 0).getTime() <= endTs);
+    rows = rows.filter(r => new Date(r.created_at).getTime() <= endTs);
   }
 
-  if(q){
+  // 模糊搜索
+  if (q) {
     rows = rows.filter(r => {
-      const cand = [
+      const combined = [
         r.model, r.name, r.storage, r.from_storage, r.to_storage,
         r.recipient, r.operator, r.comments
       ].join("|").toLowerCase();
-      return cand.includes(q);
+      return combined.includes(q);
     });
   }
 
   renderLogsTable(rows, qRaw);
 }
 
-/* ========= 日志表格渲染（带高亮） ========= */
-function renderLogsTable(rows, keyword){
+// 渲染日志表格（支持高亮）
+function renderLogsTable(rows, keyword = "") {
   const tb = byId("logs-table-body");
   const empty = byId("logs-empty");
   tb.innerHTML = "";
 
-  if(!rows || rows.length === 0){
+  if (!rows || rows.length === 0) {
     empty.classList.remove("hidden");
     return;
   }
@@ -2037,114 +2033,73 @@ function renderLogsTable(rows, keyword){
 
   // 高亮函数
   const highlight = (text) => {
-    if(!keyword) return safe(text || "");
-    const pattern = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, "gi");
+    if (!keyword) return safe(text || "");
+    const esc = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`(${esc})`, "gi");
     return safe(text || "").replace(pattern, '<mark class="bg-yellow-200 text-black">$1</mark>');
   };
 
   rows.forEach(r => {
     tb.insertAdjacentHTML("beforeend", `
-      <tr class="hover:bg-gray-50">
-        <td class="px-4 py-3">${formatLocalTime(r.ts || r.time || r.created_at)}</td>
-        <td class="px-4 py-3">${safe(r.type || "")}</td>
-        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[80px] max-w-[150px]">${highlight(r.model)}</td>
-        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[80px] max-w-[120px]">${highlight(r.name)}</td>
-        <td class="px-4 py-3">${safe(r.unit || "PCS")}</td>
-        <td class="px-4 py-3">${safe(r.quantity || r.qty || "")}</td>
-        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[30px] max-w-[120px]">${highlight(r.storage)}</td>     
-        <!-- From -->
-        <td class="px-4 py-3" style="min-width:30px;max-width:120px;word-break:break-all;">
-          ${highlight(r.from_storage)}
-        </td>
-        <!-- To -->
-        <td class="px-4 py-3" style="min-width:30px;max-width:120px;word-break:break-all;">
-          ${highlight(r.to_storage)}
-        </td>
-
-        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[30px] max-w-[80px]">${highlight(r.recipient)}</td>
-        <td class="px-4 py-3">${highlight(r.operator)}</td>
-        <td class="px-4 py-3">${highlight(r.comments)}</td>
+      <tr class="hover:bg-gray-50 text-sm">
+        <td class="px-4 py-2">${formatLocalTime(r.created_at)}</td>
+        <td class="px-4 py-2">${safe(r.type || "")}</td>
+        <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[80px] max-w-[150px]">${highlight(r.model)}</td>
+        <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[80px] max-w-[150px]">${highlight(r.name)}</td>
+        <td class="px-4 py-2">${safe(r.unit || "PCS")}</td>
+        <td class="px-4 py-2">${safe(r.qty || "")}</td>
+        <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[80px] max-w-[120px]">${highlight(r.storage)}</td>
+        <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[80px] max-w-[120px]">${highlight(r.from_storage)}</td>
+        <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[80px] max-w-[120px]">${highlight(r.to_storage)}</td>
+        <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[60px] max-w-[100px]">${highlight(r.recipient)}</td>
+        <td class="px-4 py-2">${highlight(r.operator)}</td>
+        <td class="px-4 py-2">${highlight(r.comments)}</td>
       </tr>
     `);
   });
 }
 
-// 输入框实时触发过滤
+// 输入实时搜索
 const logsSearch = document.getElementById("logs-search");
 if (logsSearch) logsSearch.addEventListener("keyup", () => applyLogsFilter());
 
-// 导出日志 CSV（当前筛选结果）
-function exportLogsCSV(){
-  const q=(byId("logs-search").value||"").trim().toLowerCase();
-  const typ=(byId("logs-type").value||"ALL").toUpperCase();
-  const startDate=byId("logs-date-start").value;
-  const endDate=byId("logs-date-end").value;
+// 导出日志 CSV
+function exportLogsCSV() {
+  const rows = [
+    ["created_at","type","model","name","unit","qty",
+     "storage","from_storage","to_storage","recipient","operator","comments"]
+  ];
 
-  let rows=logsAllRows.slice();
-  if(typ && typ!=="ALL"){
-    rows=rows.filter(r=>(r.type||"").toUpperCase()===typ);
-  }
-  if(startDate){
-    const st=new Date(startDate+"T00:00:00Z").getTime();
-    rows=rows.filter(r=>{
-      const t=new Date(r.ts||r.time||r.created_at||0).getTime();
-      return t>=st;
-    });
-  }
-  if(endDate){
-    const et=new Date(endDate+"T23:59:59Z").getTime();
-    rows=rows.filter(r=>{
-      const t=new Date(r.ts||r.time||r.created_at||0).getTime();
-      return t<=et;
-    });
-  }
-  if(q){
-    rows=rows.filter(r=>{
-      const cand=[
-        r.model,r.name,r.storage,r.from_storage,r.to_storage,
-        r.recipient,r.operator,r.comments
-      ].join("|").toLowerCase();
-      return cand.includes(q);
-    });
-  }
-
-  const exportRows=[[
-    "time","type","model","name","unit","qty",
-    "storage","from_storage","to_storage",
-    "recipient","operator","comments"
-  ]];
-
-  rows.forEach(r=>{
-    exportRows.push([
-      formatLocalTime(r.ts||r.time||r.created_at),
-      r.type||"",
-      r.model||"",
-      r.name||"",
-      r.unit||"PCS",
-      r.qty||r.quantity||"",
-      r.storage||"",
-      r.from_storage||"",
-      r.to_storage||"",
-      r.recipient||"",
-      r.operator||"",
-      r.comments||""
+  (_logsCache || []).forEach(r => {
+    rows.push([
+      formatLocalTime(r.created_at),
+      r.type || "",
+      r.model || "",
+      r.name || "",
+      r.unit || "",
+      r.qty || "",
+      r.storage || "",
+      r.from_storage || "",
+      r.to_storage || "",
+      r.recipient || "",
+      r.operator || "",
+      r.comments || ""
     ]);
   });
 
-  const csv=exportRows
-    .map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(","))
-    .join("\n");
-  const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url;
-  a.download=`logs_${Date.now()}.csv`;
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `operation_logs_${Date.now()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 
-  showNotification(T("done_export_logs",{n:rows.length}));
+  showNotification(T("done_export_logs", { n: rows.length - 1 }));
 }
 </script>
 
 </body>
 </html>
+
