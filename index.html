@@ -1945,90 +1945,206 @@ async function handleBatchTransfer(evt){
   });
 }
 
-/* ===== 日志：读取 / 筛选 / 导出 ===== */
-console.error(err);
-showNotification("加载日志失败","error");
-} finally {
-if(btn){ btn.classList.remove("disabled"); btn.innerHTML = oldHTML; }
-}
+/* ========= 17. 日志（合并 inbound / outbound / transfer） =========
+   自动汇总三类操作记录作为日志，无需 logs 表
+*/
+let logsAllRows = [];
+let _logsLoadedOnce = false;
+
+async function reloadLogs() {
+  const btn = byId("btn-logs-refresh");
+  const old = btn ? btn.innerHTML : "";
+  if (btn) {
+    btn.classList.add("disabled");
+    btn.innerHTML = "⏳";
+  }
+
+  try {
+    // 并行加载三张表
+    const [inRes, outRes, trRes] = await Promise.all([
+      supa.from("inbound").select("created_at,model,name,unit,quantity,storage,operator,comments").order("created_at",{ascending:false}).limit(10000),
+      supa.from("outbound").select("created_at,model,name,unit,quantity,storage,recipient,operator,comments").order("created_at",{ascending:false}).limit(10000),
+      supa.from("transfer").select("created_at,model,name,unit,quantity,from_storage,to_storage,operator,comments").order("created_at",{ascending:false}).limit(1000)
+    ]);
+
+    const all = [];
+    if (inRes.data) for (const r of inRes.data) all.push({ type:"INBOUND", ts:r.created_at, ...r });
+    if (outRes.data) for (const r of outRes.data) all.push({ type:"OUTBOUND", ts:r.created_at, ...r });
+    if (trRes.data) for (const r of trRes.data) all.push({ type:"TRANSFER", ts:r.created_at, ...r });
+
+    logsAllRows = all.sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+    _logsLoadedOnce = true;
+
+    applyLogsFilter();
+
+  } catch(err) {
+    console.error("日志加载失败：", err);
+    showNotification(LANG==='en'?"Failed to load logs":"日志加载失败","error");
+  }
+
+  if (btn) {
+    btn.classList.remove("disabled");
+    btn.innerHTML = old;
+  }
 }
 
-
+/* ========= 日志过滤 + 高亮渲染增强版 ========= */
 function applyLogsFilter(){
-const typeSel = byId("logs-type").value;
-const q = (byId("logs-search").value || "").trim().toLowerCase();
-const startDate = byId("logs-date-start").value ? new Date(byId("logs-date-start").value) : null;
-const endDate = byId("logs-date-end").value ? new Date(byId("logs-date-end").value) : null;
+  const qRaw = (byId("logs-search").value || "").trim();
+  const q = qRaw.toLowerCase();
+  const typ = (byId("logs-type").value || "ALL").toUpperCase();
+  const startDate = byId("logs-date-start").value;
+  const endDate = byId("logs-date-end").value;
+  let rows = logsAllRows.slice();
 
+  if(typ && typ!=="ALL"){
+    rows = rows.filter(r => (r.type || "").toUpperCase() === typ);
+  }
 
-_logsFiltered = (_logsAll||[]).filter(r=>{
-if(typeSel !== "ALL" && r.type !== typeSel) return false;
-if(startDate && new Date(r.time) < startDate) return false;
-if(endDate && new Date(r.time) > new Date(endDate.getTime() + 24*60*60*1000)) return false;
-if(q){
-const combo = `${r.model}|${r.name}|${r.storage}|${r.from}|${r.to}|${r.recipient}|${r.operator}|${r.comments}`.toLowerCase();
-if(!combo.includes(q)) return false;
-}
-return true;
-});
-renderLogsTable();
-}
+  if(startDate){
+    const startTs = new Date(startDate + "T00:00:00Z").getTime();
+    rows = rows.filter(r => new Date(r.ts || r.time || 0).getTime() >= startTs);
+  }
+  if(endDate){
+    const endTs = new Date(endDate + "T23:59:59Z").getTime();
+    rows = rows.filter(r => new Date(r.ts || r.time || 0).getTime() <= endTs);
+  }
 
+  if(q){
+    rows = rows.filter(r => {
+      const cand = [
+        r.model, r.name, r.storage, r.from_storage, r.to_storage,
+        r.recipient, r.operator, r.comments
+      ].join("|").toLowerCase();
+      return cand.includes(q);
+    });
+  }
 
-function renderLogsTable(){
-const tb = byId("logs-table-body");
-const empty = byId("logs-empty");
-tb.innerHTML = "";
-if(!_logsFiltered || _logsFiltered.length===0){
-empty.classList.remove("hidden");
-return;
-}
-empty.classList.add("hidden");
-_logsFiltered.forEach(r=>{
-tb.insertAdjacentHTML("beforeend",`
-<tr class="hover:bg-gray-50 text-sm">
-<td class="px-4 py-2">${formatLocalTime(r.time)}</td>
-<td class="px-4 py-2">${r.type}</td>
-<td class="px-4 py-2">${safe(r.model)}</td>
-<td class="px-4 py-2">${safe(r.name)}</td>
-<td class="px-4 py-2">${safe(r.unit)}</td>
-<td class="px-4 py-2 text-right">${safe(r.qty)}</td>
-<td class="px-4 py-2">${safe(r.storage)}</td>
-<td class="px-4 py-2">${safe(r.from)}</td>
-<td class="px-4 py-2">${safe(r.to)}</td>
-<td class="px-4 py-2">${safe(r.recipient)}</td>
-<td class="px-4 py-2">${safe(r.operator)}</td>
-<td class="px-4 py-2">${safe(r.comments)}</td>
-</tr>`);
-});
+  renderLogsTable(rows, qRaw);
 }
 
+/* ========= 日志表格渲染（带高亮） ========= */
+function renderLogsTable(rows, keyword){
+  const tb = byId("logs-table-body");
+  const empty = byId("logs-empty");
+  tb.innerHTML = "";
 
+  if(!rows || rows.length === 0){
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+
+  // 高亮函数
+  const highlight = (text) => {
+    if(!keyword) return safe(text || "");
+    const pattern = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, "gi");
+    return safe(text || "").replace(pattern, '<mark class="bg-yellow-200 text-black">$1</mark>');
+  };
+
+  rows.forEach(r => {
+    tb.insertAdjacentHTML("beforeend", `
+      <tr class="hover:bg-gray-50">
+        <td class="px-4 py-3">${formatLocalTime(r.ts || r.time || r.created_at)}</td>
+        <td class="px-4 py-3">${safe(r.type || "")}</td>
+        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[80px] max-w-[150px]">${highlight(r.model)}</td>
+        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[80px] max-w-[120px]">${highlight(r.name)}</td>
+        <td class="px-4 py-3">${safe(r.unit || "PCS")}</td>
+        <td class="px-4 py-3">${safe(r.quantity || r.qty || "")}</td>
+        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[30px] max-w-[120px]">${highlight(r.storage)}</td>     
+        <!-- From -->
+        <td class="px-4 py-3" style="min-width:30px;max-width:120px;word-break:break-all;">
+          ${highlight(r.from_storage)}
+        </td>
+        <!-- To -->
+        <td class="px-4 py-3" style="min-width:30px;max-width:120px;word-break:break-all;">
+          ${highlight(r.to_storage)}
+        </td>
+
+        <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[30px] max-w-[80px]">${highlight(r.recipient)}</td>
+        <td class="px-4 py-3">${highlight(r.operator)}</td>
+        <td class="px-4 py-3">${highlight(r.comments)}</td>
+      </tr>
+    `);
+  });
+}
+
+// 输入框实时触发过滤
+const logsSearch = document.getElementById("logs-search");
+if (logsSearch) logsSearch.addEventListener("keyup", () => applyLogsFilter());
+
+// 导出日志 CSV（当前筛选结果）
 function exportLogsCSV(){
-if(!_logsFiltered || _logsFiltered.length===0){
-showNotification(LANG==='en'?"No data to export":"暂无可导出数据","error");
-return;
-}
-const header = ["time","type","model","name","unit","qty","storage","from","to","recipient","operator","comments"];
-const rows = [header];
-_logsFiltered.forEach(r=>{
-rows.push(header.map(k=>r[k]||""));
-});
-const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
-const blob = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8;"});
-const a = document.createElement("a");
-a.href = URL.createObjectURL(blob);
-a.download = `logs_${Date.now()}.csv`;
-a.click();
-URL.revokeObjectURL(a.href);
-showNotification(T("done_export_logs",{n:_logsFiltered.length}));
-}
-</script>
+  const q=(byId("logs-search").value||"").trim().toLowerCase();
+  const typ=(byId("logs-type").value||"ALL").toUpperCase();
+  const startDate=byId("logs-date-start").value;
+  const endDate=byId("logs-date-end").value;
 
+  let rows=logsAllRows.slice();
+  if(typ && typ!=="ALL"){
+    rows=rows.filter(r=>(r.type||"").toUpperCase()===typ);
+  }
+  if(startDate){
+    const st=new Date(startDate+"T00:00:00Z").getTime();
+    rows=rows.filter(r=>{
+      const t=new Date(r.ts||r.time||r.created_at||0).getTime();
+      return t>=st;
+    });
+  }
+  if(endDate){
+    const et=new Date(endDate+"T23:59:59Z").getTime();
+    rows=rows.filter(r=>{
+      const t=new Date(r.ts||r.time||r.created_at||0).getTime();
+      return t<=et;
+    });
+  }
+  if(q){
+    rows=rows.filter(r=>{
+      const cand=[
+        r.model,r.name,r.storage,r.from_storage,r.to_storage,
+        r.recipient,r.operator,r.comments
+      ].join("|").toLowerCase();
+      return cand.includes(q);
+    });
+  }
+
+  const exportRows=[[
+    "time","type","model","name","unit","qty",
+    "storage","from_storage","to_storage",
+    "recipient","operator","comments"
+  ]];
+
+  rows.forEach(r=>{
+    exportRows.push([
+      formatLocalTime(r.ts||r.time||r.created_at),
+      r.type||"",
+      r.model||"",
+      r.name||"",
+      r.unit||"PCS",
+      r.qty||r.quantity||"",
+      r.storage||"",
+      r.from_storage||"",
+      r.to_storage||"",
+      r.recipient||"",
+      r.operator||"",
+      r.comments||""
+    ]);
+  });
+
+  const csv=exportRows
+    .map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(","))
+    .join("\n");
+  const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=`logs_${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  showNotification(T("done_export_logs",{n:rows.length}));
+}
 </script>
 
 </body>
 </html>
-
-
-
