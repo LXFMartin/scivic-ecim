@@ -1960,26 +1960,47 @@ async function reloadLogs() {
   }
 
   try {
-    // 并行加载三张表
+    // ✅ 并行加载三张表（已改为 created_at）
     const [inRes, outRes, trRes] = await Promise.all([
-      supa.from("inbound").select("created_at,model,name,unit,quantity,storage,operator,comments").order("created_at",{ascending:false}).limit(10000),
-      supa.from("outbound").select("created_at,model,name,unit,quantity,storage,recipient,operator,comments").order("created_at",{ascending:false}).limit(10000),
-      supa.from("transfer").select("created_at,model,name,unit,quantity,from_storage,to_storage,operator,comments").order("created_at",{ascending:false}).limit(10000)
+      supa.from("inbound")
+          .select("created_at,model,name,unit,quantity,storage,operator,comments")
+          .order("created_at",{ascending:false})
+          .limit(10000),
+
+      supa.from("outbound")
+          .select("created_at,model,name,unit,quantity,storage,recipient,operator,comments")
+          .order("created_at",{ascending:false})
+          .limit(10000),
+
+      supa.from("transfer")
+          .select("created_at,model,name,unit,quantity,from_storage,to_storage,operator,comments")
+          .order("created_at",{ascending:false})
+          .limit(1000)
     ]);
 
     const all = [];
-    if (inRes.data) for (const r of inRes.data) all.push({ type:"INBOUND", ts:r.created_at, ...r });
-    if (outRes.data) for (const r of outRes.data) all.push({ type:"OUTBOUND", ts:r.created_at, ...r });
-    if (trRes.data) for (const r of trRes.data) all.push({ type:"TRANSFER", ts:r.r.created_at, ...r });
 
-    logsAllRows = all.sort((a,b)=>new Date(b.ts)-new Date(a.ts));
+    if (inRes.data)
+      for (const r of inRes.data)
+        all.push({ type: "INBOUND", ts: r.created_at, ...r });
+
+    if (outRes.data)
+      for (const r of outRes.data)
+        all.push({ type: "OUTBOUND", ts: r.created_at, ...r });
+
+    if (trRes.data)
+      for (const r of trRes.data)
+        all.push({ type: "TRANSFER", ts: r.created_at, ...r });
+
+    // ✅ 排序 & 缓存
+    logsAllRows = all.sort((a, b) => new Date(b.ts) - new Date(a.ts));
     _logsLoadedOnce = true;
 
     applyLogsFilter();
 
-  } catch(err) {
+  } catch (err) {
     console.error("日志加载失败：", err);
-    showNotification(LANG==='en'?"Failed to load logs":"日志加载失败","error");
+    showNotification(LANG === 'en' ? "Failed to load logs" : "日志加载失败", "error");
   }
 
   if (btn) {
@@ -1987,7 +2008,6 @@ async function reloadLogs() {
     btn.innerHTML = old;
   }
 }
-
 /* ========= 日志过滤 + 高亮渲染增强版 ========= */
 function applyLogsFilter(){
   const qRaw = (byId("logs-search").value || "").trim();
@@ -2148,6 +2168,7 @@ function exportLogsCSV(){
 
 </body>
 </html>
+
 
 
 
