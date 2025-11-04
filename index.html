@@ -1992,33 +1992,48 @@ function applyLogsFilter() {
   console.log("总记录数:", _logsCache.length);
 
   let filtered = _logsCache.slice();
-  // 类型筛选
-  if (type && type !== "ALL") {
-    rows = rows.filter(r => (r.type || "").toUpperCase() === type);
+
+  // 类型过滤
+  if (type !== "ALL") {
+    filtered = filtered.filter(it => (it.type || "").toUpperCase().trim() === type);
   }
 
-  // 日期范围筛选
-  if (startDate) {
-    const startTs = new Date(startDate + "T00:00:00Z").getTime();
-    rows = rows.filter(r => new Date(r.created_at).getTime() >= startTs);
-  }
-  if (endDate) {
-    const endTs = new Date(endDate + "T23:59:59Z").getTime();
-    rows = rows.filter(r => new Date(r.created_at).getTime() <= endTs);
+  // 日期范围过滤（字段 created_at）
+  if (start) {
+    const startTs = new Date(start + "T00:00:00Z").getTime();
+    filtered = filtered.filter(it => {
+      const t = new Date(it.created_at || "").getTime();
+      return !isNaN(t) && t >= startTs;
+    });
   }
 
-  // 模糊搜索
+  if (end) {
+    const endTs = new Date(end + "T23:59:59Z").getTime();
+    filtered = filtered.filter(it => {
+      const t = new Date(it.created_at || "").getTime();
+      return !isNaN(t) && t <= endTs;
+    });
+  }
+
+  // 模糊搜索（空值安全）
   if (q) {
-    rows = rows.filter(r => {
+    filtered = filtered.filter(it => {
       const combined = [
-        r.model, r.name, r.storage, r.from_storage, r.to_storage,
-        r.recipient, r.operator, r.comments
-      ].join("|").toLowerCase();
+        it.model || "",
+        it.name || "",
+        it.storage || "",
+        it.from_storage || "",
+        it.to_storage || "",
+        it.recipient || "",
+        it.operator || "",
+        it.comments || ""
+      ].join(" ").toLowerCase();
       return combined.includes(q);
     });
   }
+
   console.log("筛选后记录数:", filtered.length);
-  renderLogsTable(rows, qRaw);
+  renderLogsTable(filtered, q);
 }
 
 // 渲染日志表格（支持高亮）
@@ -2104,6 +2119,7 @@ function exportLogsCSV() {
 
 </body>
 </html>
+
 
 
 
