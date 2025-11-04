@@ -2047,6 +2047,7 @@ function applyLogsFilter() {
   }
 
   console.log("筛选后记录数:", filtered.length);
+  window._logsFiltered = filtered;
   renderLogsTable(filtered, q);
 }
 
@@ -2100,8 +2101,11 @@ function exportLogsCSV() {
     ["created_at","type","model","name","unit","quantity",
      "storage","from_storage","to_storage","recipient","operator","comments"]
   ];
-
-  (_logsCache || []).forEach(r => {
+// ✅ 若有筛选结果优先导出筛选后的，否则导出全部
+  const dataToExport = (window._logsFiltered && window._logsFiltered.length)
+    ? window._logsFiltered
+    : _logsCache;
+  dataToExport.forEach(r => {
     rows.push([
       formatLocalTime(r.created_at),
       r.type || "",
@@ -2133,6 +2137,7 @@ function exportLogsCSV() {
 
 </body>
 </html>
+
 
 
 
