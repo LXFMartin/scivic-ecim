@@ -2078,7 +2078,7 @@ function renderLogsTable(rows, keyword = "") {
         <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[80px] max-w-[150px]">${highlight(r.model)}</td>
         <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[80px] max-w-[150px]">${highlight(r.name)}</td>
         <td class="px-4 py-2">${safe(r.unit || "PCS")}</td>
-        <td class="px-4 py-2">${safe(r.qty || "")}</td>
+        <td class="px-4 py-2">${safe(r.quantity || r.qty || "")}</td>
         <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[80px] max-w-[120px]">${highlight(r.storage)}</td>
         <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[80px] max-w-[120px]">${highlight(r.from_storage)}</td>
         <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[80px] max-w-[120px]">${highlight(r.to_storage)}</td>
@@ -2133,6 +2133,7 @@ function exportLogsCSV() {
 
 </body>
 </html>
+
 
 
 
