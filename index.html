@@ -1962,9 +1962,9 @@ async function reloadLogs() {
   try {
     // 并行加载三张表
     const [inRes, outRes, trRes] = await Promise.all([
-      supa.from("inbound").select("timestamp,model,name,unit,quantity,storage,operator,comments").order("timestamp",{ascending:false}).limit(1000),
-      supa.from("outbound").select("timestamp,model,name,unit,quantity,storage,recipient,operator,comments").order("timestamp",{ascending:false}).limit(1000),
-      supa.from("transfer").select("timestamp,model,name,unit,quantity,from_storage,to_storage,operator,comments").order("timestamp",{ascending:false}).limit(1000)
+      supa.from("inbound").select("timestamp,model,name,unit,quantity,storage,operator,comments").order("timestamp",{ascending:false}),
+      supa.from("outbound").select("timestamp,model,name,unit,quantity,storage,recipient,operator,comments").order("timestamp",{ascending:false}),
+      supa.from("transfer").select("timestamp,model,name,unit,quantity,from_storage,to_storage,operator,comments").order("timestamp",{ascending:false})
     ]);
 
     const all = [];
@@ -2148,4 +2148,5 @@ function exportLogsCSV(){
 
 </body>
 </html>
+
 
