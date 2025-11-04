@@ -1962,9 +1962,9 @@ async function reloadLogs() {
   try {
     // 并行加载三张表
     const [inRes, outRes, trRes] = await Promise.all([
-      supa.from("inbound").select("timestamp,model,name,unit,quantity,storage,operator,comments").order("timestamp",{ascending:false}).limit(10000),
-      supa.from("outbound").select("timestamp,model,name,unit,quantity,storage,recipient,operator,comments").order("timestamp",{ascending:false}).limit(10000),
-      supa.from("transfer").select("timestamp,model,name,unit,quantity,from_storage,to_storage,operator,comments").order("timestamp",{ascending:false}).limit(10000)
+      supa.from("inbound").select("created_at,model,name,unit,quantity,storage,operator,comments").order("created_at",{ascending:false}).limit(10000),
+      supa.from("outbound").select("created_at,model,name,unit,quantity,storage,recipient,operator,comments").order("created_at",{ascending:false}).limit(10000),
+      supa.from("transfer").select("created_at,model,name,unit,quantity,from_storage,to_storage,operator,comments").order("created_at",{ascending:false}).limit(10000)
     ]);
 
     const all = [];
@@ -2045,7 +2045,7 @@ function renderLogsTable(rows, keyword){
   rows.forEach(r => {
     tb.insertAdjacentHTML("beforeend", `
       <tr class="hover:bg-gray-50">
-        <td class="px-4 py-3">${formatLocalTime(r.ts || r.time || r.timestamp)}</td>
+        <td class="px-4 py-3">${formatLocalTime(r.ts || r.time || r.created_at)}</td>
         <td class="px-4 py-3">${safe(r.type || "")}</td>
         <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[80px] max-w-[150px]">${highlight(r.model)}</td>
         <td class="px-4 py-3 text-sm break-words whitespace-normal min-w-[80px] max-w-[120px]">${highlight(r.name)}</td>
@@ -2087,14 +2087,14 @@ function exportLogsCSV(){
   if(startDate){
     const st=new Date(startDate+"T00:00:00Z").getTime();
     rows=rows.filter(r=>{
-      const t=new Date(r.ts||r.time||r.timestamp||0).getTime();
+      const t=new Date(r.ts||r.time||r.created_at||0).getTime();
       return t>=st;
     });
   }
   if(endDate){
     const et=new Date(endDate+"T23:59:59Z").getTime();
     rows=rows.filter(r=>{
-      const t=new Date(r.ts||r.time||r.timestamp||0).getTime();
+      const t=new Date(r.ts||r.time||r.created_at||0).getTime();
       return t<=et;
     });
   }
@@ -2116,7 +2116,7 @@ function exportLogsCSV(){
 
   rows.forEach(r=>{
     exportRows.push([
-      formatLocalTime(r.ts||r.time||r.timestamp),
+      formatLocalTime(r.ts||r.time||r.created_at),
       r.type||"",
       r.model||"",
       r.name||"",
@@ -2148,6 +2148,7 @@ function exportLogsCSV(){
 
 </body>
 </html>
+
 
 
 
