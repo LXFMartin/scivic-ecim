@@ -1982,20 +1982,16 @@ async function reloadLogs() {
 
 // 筛选 + 搜索
 function applyLogsFilter() {
-  console.log("🧭 进入 applyLogsFilter");
-  console.log("类型:", byId("logs-type").value);
-  console.log("搜索:", byId("logs-search").value);
-  console.log("开始日期:", byId("logs-date-start").value);
-  console.log("结束日期:", byId("logs-date-end").value);
-  console.log("总记录数:", _logsCache.length);
-  const qRaw = (byId("logs-search").value || "").trim();
-  const q = qRaw.toLowerCase();
   const type = (byId("logs-type").value || "ALL").toUpperCase();
-  const startDate = byId("logs-date-start").value;
-  const endDate = byId("logs-date-end").value;
+  const q = (byId("logs-search").value || "").toLowerCase().trim();
+  const start = byId("logs-date-start").value;
+  const end = byId("logs-date-end").value;
 
-  let rows = (_logsCache || []).slice();
+  console.log("🧭 进入 applyLogsFilter");
+  console.log("类型:", type, "搜索:", q, "开始:", start, "结束:", end);
+  console.log("总记录数:", _logsCache.length);
 
+  let filtered = _logsCache.slice();
   // 类型筛选
   if (type && type !== "ALL") {
     rows = rows.filter(r => (r.type || "").toUpperCase() === type);
@@ -2108,6 +2104,7 @@ function exportLogsCSV() {
 
 </body>
 </html>
+
 
 
 
