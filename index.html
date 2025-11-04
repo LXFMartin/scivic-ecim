@@ -1960,7 +1960,7 @@ async function reloadLogs() {
 
   try {
     const { data, error } = await supa
-      .from("log_all")
+      .from("logs_all")
       .select("*")
       .order("created_at", { ascending: false });
 
@@ -2102,4 +2102,5 @@ function exportLogsCSV() {
 
 </body>
 </html>
+
 
