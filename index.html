@@ -1945,96 +1945,33 @@ async function handleBatchTransfer(evt){
   });
 }
 
-/* ========= 17. 日志（使用数据库视图 logs_all） =========
-   由 Supabase 视图 logs_all 自动合并 inbound/outbound/transfer，
-   前端只需一次查询即可加载全部操作日志
-*/
-let logsAllRows = [];
-let _logsLoadedOnce = false;
+/* ===== 日志：读取/筛选/导出 ===== */
+let _logsAll=[]; let _logsFiltered=[]; let _logsLoadedOnce=false;
+async function reloadLogs(){
+  const btn=document.getElementById("btn-logs-refresh"); const old=btn?btn.innerHTML:"";
+  if(btn){ btn.classList.add("disabled"); btn.innerHTML="⏳"; }
+    const [inb, outb, tf] = await Promise.all([
+    supa.from("inbound").select("*").range(0, 9999).order("timestamp",{ascending:false}),
+    supa.from("outbound").select("*").range(0, 9999).order("timestamp",{ascending:false}),
+    supa.from("transfer").select("*").range(0, 9999).order("timestamp",{ascending:false})
+  ]);
+  const listInbound = (inb.data||[]).map(r=>({ type:"INBOUND", time:r.timestamp||r.created_at||"", model:r.model||"", name:r.name||"", unit:r.unit||"PCS", quantity:r.quantity||0, storage:r.storage||"", from_storage:"", to_storage:"", recipient:"", operator:r.operator||"", comments:r.comments||"" }));
+  const listOutbound= (outb.data||[]).map(r=>({ type:"OUTBOUND",time:r.timestamp||r.created_at||"", model:r.model||"", name:r.name||"", unit:r.unit||"PCS", quantity:r.quantity||0, storage:r.storage||"", from_storage:"", to_storage:"", recipient:r.recipient||"", operator:r.operator||"", comments:r.comments||"" }));
+  const listTransfer= (tf.data ||[]).map(r=>({ type:"TRANSFER",time:r.timestamp||r.created_at||"", model:r.model||"", name:r.name||"", unit:r.unit||"PCS", quantity:r.quantity||0, storage:"", from_storage:r.from_storage||"", to_storage:r.to_storage||"", recipient:"", operator:r.operator||"", comments:r.comments||"" }));
 
-async function reloadLogs() {
-  const btn = byId("btn-logs-refresh");
-  const old = btn ? btn.innerHTML : "";
-  if (btn) {
-    btn.classList.add("disabled");
-    btn.innerHTML = "⏳";
-  }
-
-  try {
-    // ✅ 从 logs_all 视图一次性获取全部日志（无需多表合并）
-    const { data, error } = await supa
-      .from("logs_all")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .range(0, 9999);
-
-    if (error) throw error;
-
-    // ✅ 数据赋值与排序
-    logsAllRows = (data || []).map(r => ({
-      type: r.type || "",
-      model: r.model || "",
-      name: r.name || "",
-      unit: r.unit || "PCS",
-      quantity: r.quantity || 0,
-      storage: r.storage || "",
-      from_storage: r.from_storage || "",
-      to_storage: r.to_storage || "",
-      recipient: r.recipient || "",
-      operator: r.operator || "",
-      comments: r.comments || "",
-      ts: r.created_at || ""
-    })).sort((a, b) => new Date(b.ts) - new Date(a.ts));
-
-    _logsLoadedOnce = true;
-    applyLogsFilter();
-
-  } catch (err) {
-    console.error("日志加载失败：", err);
-    showNotification(LANG === "en" ? "Failed to load logs" : "日志加载失败", "error");
-  }
-
-  if (btn) {
-    btn.classList.remove("disabled");
-    btn.innerHTML = old;
-  }
+  _logsAll=[...listInbound, ...listOutbound, ...listTransfer].sort((a,b)=> (new Date(b.time||0)) - (new Date(a.time||0)));
+  _logsLoadedOnce=true;
+  applyLogsFilter();
+  if(btn){ btn.classList.remove("disabled"); btn.innerHTML=old; }
 }
-
-/* ========= 日志过滤 + 高亮渲染增强版 ========= */
 function applyLogsFilter(){
-  const qRaw = (byId("logs-search").value || "").trim();
-  const q = qRaw.toLowerCase();
-  const typ = (byId("logs-type").value || "ALL").toUpperCase();
-  const startDate = byId("logs-date-start").value;
-  const endDate = byId("logs-date-end").value;
-  let rows = logsAllRows.slice();
+  const type=document.getElementById("logs-type").value;
+  const q=normStr(document.getElementById("logs-search").value||"");
+  const startDate=document.getElementById("logs-date-start").value;
+  const endDate=document.getElementById("logs-date-end").value;
 
-  if(typ && typ!=="ALL"){
-    rows = rows.filter(r => (r.type || "").toUpperCase() === typ);
-  }
-
-  if(startDate){
-    const startTs = new Date(startDate + "T00:00:00Z").getTime();
-    rows = rows.filter(r => new Date(r.ts || r.time || 0).getTime() >= startTs);
-  }
-  if(endDate){
-    const endTs = new Date(endDate + "T23:59:59Z").getTime();
-    rows = rows.filter(r => new Date(r.ts || r.time || 0).getTime() <= endTs);
-  }
-
-  if(q){
-    rows = rows.filter(r => {
-      const cand = [
-        r.model, r.name, r.storage, r.from_storage, r.to_storage,
-        r.recipient, r.operator, r.comments
-      ].join("|").toLowerCase();
-      return cand.includes(q);
-    });
-  }
-
-  renderLogsTable(rows, qRaw);
-}
-
+  _logsFiltered=_logsAll.filter(row=>{
+    if(type!=="ALL" && row.type!==type) return false;
 /* ========= 日志表格渲染（带高亮） ========= */
 function renderLogsTable(rows, keyword){
   const tb = byId("logs-table-body");
@@ -2160,6 +2097,7 @@ function exportLogsCSV(){
 
 </body>
 </html>
+
 
 
 
