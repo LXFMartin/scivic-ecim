@@ -2097,7 +2097,7 @@ if (logsSearch) logsSearch.addEventListener("keyup", () => applyLogsFilter());
 // 导出日志 CSV
 function exportLogsCSV() {
   const rows = [
-    ["created_at","type","model","name","unit","qty",
+    ["created_at","type","model","name","unit","quantity",
      "storage","from_storage","to_storage","recipient","operator","comments"]
   ];
 
@@ -2108,7 +2108,7 @@ function exportLogsCSV() {
       r.model || "",
       r.name || "",
       r.unit || "",
-      r.qty || "",
+      r.quantity || r.qty || "",
       r.storage || "",
       r.from_storage || "",
       r.to_storage || "",
@@ -2133,6 +2133,7 @@ function exportLogsCSV() {
 
 </body>
 </html>
+
 
 
 
