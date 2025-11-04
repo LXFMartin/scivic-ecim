@@ -1945,8 +1945,9 @@ async function handleBatchTransfer(evt){
   });
 }
 
-/* ========= 17. 日志（合并 inbound / outbound / transfer） =========
-   自动汇总三类操作记录作为日志，无需 logs 表
+/* ========= 17. 日志（使用数据库视图 logs_all） =========
+   由 Supabase 视图 logs_all 自动合并 inbound/outbound/transfer，
+   前端只需一次查询即可加载全部操作日志
 */
 let logsAllRows = [];
 let _logsLoadedOnce = false;
@@ -1960,47 +1961,37 @@ async function reloadLogs() {
   }
 
   try {
-    // ✅ 并行加载三张表（已改为 created_at）
-    const [inRes, outRes, trRes] = await Promise.all([
-      supa.from("inbound")
-          .select("created_at,model,name,unit,quantity,storage,operator,comments")
-          .order("created_at",{ascending:false})
-          .limit(10000),
+    // ✅ 从 logs_all 视图一次性获取全部日志（无需多表合并）
+    const { data, error } = await supa
+      .from("logs_all")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .range(0, 9999);
 
-      supa.from("outbound")
-          .select("created_at,model,name,unit,quantity,storage,recipient,operator,comments")
-          .order("created_at",{ascending:false})
-          .limit(10000),
+    if (error) throw error;
 
-      supa.from("transfer")
-          .select("created_at,model,name,unit,quantity,from_storage,to_storage,operator,comments")
-          .order("created_at",{ascending:false})
-          .limit(1000)
-    ]);
+    // ✅ 数据赋值与排序
+    logsAllRows = (data || []).map(r => ({
+      type: r.type || "",
+      model: r.model || "",
+      name: r.name || "",
+      unit: r.unit || "PCS",
+      quantity: r.quantity || 0,
+      storage: r.storage || "",
+      from_storage: r.from_storage || "",
+      to_storage: r.to_storage || "",
+      recipient: r.recipient || "",
+      operator: r.operator || "",
+      comments: r.comments || "",
+      ts: r.created_at || ""
+    })).sort((a, b) => new Date(b.ts) - new Date(a.ts));
 
-    const all = [];
-
-    if (inRes.data)
-      for (const r of inRes.data)
-        all.push({ type: "INBOUND", ts: r.created_at, ...r });
-
-    if (outRes.data)
-      for (const r of outRes.data)
-        all.push({ type: "OUTBOUND", ts: r.created_at, ...r });
-
-    if (trRes.data)
-      for (const r of trRes.data)
-        all.push({ type: "TRANSFER", ts: r.created_at, ...r });
-
-    // ✅ 排序 & 缓存
-    logsAllRows = all.sort((a, b) => new Date(b.ts) - new Date(a.ts));
     _logsLoadedOnce = true;
-
     applyLogsFilter();
 
   } catch (err) {
     console.error("日志加载失败：", err);
-    showNotification(LANG === 'en' ? "Failed to load logs" : "日志加载失败", "error");
+    showNotification(LANG === "en" ? "Failed to load logs" : "日志加载失败", "error");
   }
 
   if (btn) {
@@ -2008,6 +1999,7 @@ async function reloadLogs() {
     btn.innerHTML = old;
   }
 }
+
 /* ========= 日志过滤 + 高亮渲染增强版 ========= */
 function applyLogsFilter(){
   const qRaw = (byId("logs-search").value || "").trim();
@@ -2168,6 +2160,7 @@ function exportLogsCSV(){
 
 </body>
 </html>
+
 
 
 
