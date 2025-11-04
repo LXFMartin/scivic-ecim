@@ -2093,10 +2093,116 @@ function exportLogsCSV(){
 
   showNotification(T("done_export_logs",{n:rows.length}));
 }
+    /* ===== 日志：读取 / 筛选 / 导出 ===== */
+let _logsAll = [];
+let _logsFiltered = [];
+let _logsLoadedOnce = false;
+
+async function reloadLogs(){
+  const btn = document.getElementById("btn-logs-refresh");
+  const old = btn ? btn.innerHTML : "";
+  if(btn){ btn.classList.add("disabled"); btn.innerHTML="⏳"; }
+
+  const { data, error } = await supa
+    .from("logs_all")
+    .select("*")
+    .order("time", { ascending: false })
+    .limit(2000);
+
+  if(error){
+    showNotification("日志加载失败：" + error.message, "error");
+    if(btn){ btn.classList.remove("disabled"); btn.innerHTML=old; }
+    return;
+  }
+
+  _logsAll = data || [];
+  _logsLoadedOnce = true;
+  applyLogsFilter();
+
+  if(btn){ btn.classList.remove("disabled"); btn.innerHTML=old; }
+}
+
+function applyLogsFilter(){
+  const type = document.getElementById("logs-type").value;
+  const q = normStr(document.getElementById("logs-search").value || "");
+  const startDate = document.getElementById("logs-date-start").value;
+  const endDate = document.getElementById("logs-date-end").value;
+
+  _logsFiltered = _logsAll.filter(row=>{
+    if(type !== "ALL" && row.type !== type) return false;
+    if(startDate && row.time < startDate) return false;
+    if(endDate && row.time > endDate + "T23:59:59") return false;
+    if(q){
+      const combined = [row.model,row.name,row.storage,row.from,row.to,row.recipient,row.operator,row.comments].join("|");
+      if(!normStr(combined).includes(q)) return false;
+    }
+    return true;
+  });
+
+  renderLogsTable(_logsFiltered, q);
+}
+
+function renderLogsTable(rows, keyword){
+  const tb = byId("logs-table-body");
+  const empty = byId("logs-empty");
+  tb.innerHTML = "";
+
+  if(!rows || rows.length === 0){
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+
+  rows.forEach(r=>{
+    tb.insertAdjacentHTML("beforeend",`
+      <tr>
+        <td class="px-4 py-2">${formatLocalTime(r.time)}</td>
+        <td class="px-4 py-2">${r.type}</td>
+        <td class="px-4 py-2">${safe(r.model)}</td>
+        <td class="px-4 py-2">${safe(r.name)}</td>
+        <td class="px-4 py-2">${safe(r.unit)}</td>
+        <td class="px-4 py-2 text-right">${r.qty ?? r.quantity ?? 0}</td>
+        <td class="px-4 py-2">${safe(r.storage)}</td>
+        <td class="px-4 py-2">${safe(r.from)}</td>
+        <td class="px-4 py-2">${safe(r.to)}</td>
+        <td class="px-4 py-2">${safe(r.recipient)}</td>
+        <td class="px-4 py-2">${safe(r.operator)}</td>
+        <td class="px-4 py-2">${safe(r.comments)}</td>
+      </tr>
+    `);
+  });
+}
+
+function exportLogsCSV(){
+  const list = _logsFiltered || [];
+  if(!list.length){
+    showNotification("无日志可导出", "error");
+    return;
+  }
+
+  const header=["time","type","model","name","unit","qty","storage","from","to","recipient","operator","comments"];
+  const rows=[header];
+  list.forEach(r=>{
+    rows.push(header.map(k=>r[k]||""));
+  });
+
+  const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=`logs_${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  showNotification(T("done_export_logs",{n:list.length}));
+}
+
 </script>
 
 </body>
 </html>
+
 
 
 
