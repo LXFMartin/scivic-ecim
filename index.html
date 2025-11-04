@@ -1951,13 +1951,13 @@ async function reloadLogs(){
   const btn=document.getElementById("btn-logs-refresh"); const old=btn?btn.innerHTML:"";
   if(btn){ btn.classList.add("disabled"); btn.innerHTML="⏳"; }
     const [inb, outb, tf] = await Promise.all([
-    supa.from("inbound").select("*").range(0, 9999).order("timestamp",{ascending:false}),
-    supa.from("outbound").select("*").range(0, 9999).order("timestamp",{ascending:false}),
-    supa.from("transfer").select("*").range(0, 9999).order("timestamp",{ascending:false})
+    supa.from("inbound").select("*").range(0, 9999).order("created_at",{ascending:false}),
+    supa.from("outbound").select("*").range(0, 9999).order("created_at",{ascending:false}),
+    supa.from("transfer").select("*").range(0, 9999).order("created_at",{ascending:false})
   ]);
-  const listInbound = (inb.data||[]).map(r=>({ type:"INBOUND", time:r.timestamp||r.created_at||"", model:r.model||"", name:r.name||"", unit:r.unit||"PCS", quantity:r.quantity||0, storage:r.storage||"", from_storage:"", to_storage:"", recipient:"", operator:r.operator||"", comments:r.comments||"" }));
-  const listOutbound= (outb.data||[]).map(r=>({ type:"OUTBOUND",time:r.timestamp||r.created_at||"", model:r.model||"", name:r.name||"", unit:r.unit||"PCS", quantity:r.quantity||0, storage:r.storage||"", from_storage:"", to_storage:"", recipient:r.recipient||"", operator:r.operator||"", comments:r.comments||"" }));
-  const listTransfer= (tf.data ||[]).map(r=>({ type:"TRANSFER",time:r.timestamp||r.created_at||"", model:r.model||"", name:r.name||"", unit:r.unit||"PCS", quantity:r.quantity||0, storage:"", from_storage:r.from_storage||"", to_storage:r.to_storage||"", recipient:"", operator:r.operator||"", comments:r.comments||"" }));
+  const listInbound = (inb.data||[]).map(r=>({ type:"INBOUND", time:r.created_at||r.created_at||"", model:r.model||"", name:r.name||"", unit:r.unit||"PCS", quantity:r.quantity||0, storage:r.storage||"", from_storage:"", to_storage:"", recipient:"", operator:r.operator||"", comments:r.comments||"" }));
+  const listOutbound= (outb.data||[]).map(r=>({ type:"OUTBOUND",time:r.created_at||r.created_at||"", model:r.model||"", name:r.name||"", unit:r.unit||"PCS", quantity:r.quantity||0, storage:r.storage||"", from_storage:"", to_storage:"", recipient:r.recipient||"", operator:r.operator||"", comments:r.comments||"" }));
+  const listTransfer= (tf.data ||[]).map(r=>({ type:"TRANSFER",time:r.created_at||r.created_at||"", model:r.model||"", name:r.name||"", unit:r.unit||"PCS", quantity:r.quantity||0, storage:"", from_storage:r.from_storage||"", to_storage:r.to_storage||"", recipient:"", operator:r.operator||"", comments:r.comments||"" }));
 
   _logsAll=[...listInbound, ...listOutbound, ...listTransfer].sort((a,b)=> (new Date(b.time||0)) - (new Date(a.time||0)));
   _logsLoadedOnce=true;
@@ -2094,120 +2094,149 @@ function exportLogsCSV(){
   showNotification(T("done_export_logs",{n:rows.length}));
 }
     /* ===== 日志：读取 / 筛选 / 导出 ===== */
+<script>
+/* ===== 日志：读取 / 筛选 / 导出 ===== */
 let _logsAll = [];
 let _logsFiltered = [];
 let _logsLoadedOnce = false;
 
 async function reloadLogs(){
-  const btn = document.getElementById("btn-logs-refresh");
-  const old = btn ? btn.innerHTML : "";
-  if(btn){ btn.classList.add("disabled"); btn.innerHTML="⏳"; }
+  const btn = byId("btn-logs-refresh");
+  const oldHTML = btn ? btn.innerHTML : "";
+  if(btn){ btn.classList.add("disabled"); btn.innerHTML = "⏳"; }
+  try {
+    const [inb, outb, tf] = await Promise.all([
+      supa.from("inbound").select("*").range(0, 9999).order("created_at", {ascending:false}),
+      supa.from("outbound").select("*").range(0, 9999).order("created_at", {ascending:false}),
+      supa.from("transfer").select("*").range(0, 9999).order("created_at", {ascending:false})
+    ]);
 
-  const { data, error } = await supa
-    .from("logs_all")
-    .select("*")
-    .order("time", { ascending: false })
-    .limit(2000);
+    const listInbound = (inb.data||[]).map(r=>({
+      type: "INBOUND",
+      time: r.created_at || "",
+      model: r.model || "",
+      name: r.name || "",
+      unit: r.unit || "PCS",
+      qty: r.quantity || r.qty || 0,
+      storage: r.storage || "",
+      from: "",
+      to: "",
+      recipient: "",
+      operator: r.operator || "",
+      comments: r.comments || ""
+    }));
 
-  if(error){
-    showNotification("日志加载失败：" + error.message, "error");
-    if(btn){ btn.classList.remove("disabled"); btn.innerHTML=old; }
-    return;
+    const listOutbound = (outb.data||[]).map(r=>({
+      type: "OUTBOUND",
+      time: r.created_at || "",
+      model: r.model || "",
+      name: r.name || "",
+      unit: r.unit || "PCS",
+      qty: r.quantity || r.qty || 0,
+      storage: r.storage || "",
+      from: "",
+      to: "",
+      recipient: r.recipient || "",
+      operator: r.operator || "",
+      comments: r.comments || ""
+    }));
+
+    const listTransfer = (tf.data||[]).map(r=>({
+      type: "TRANSFER",
+      time: r.created_at || "",
+      model: r.model || "",
+      name: r.name || "",
+      unit: r.unit || "PCS",
+      qty: r.quantity || r.qty || 0,
+      storage: "",
+      from: r.from_storage || r.from || "",
+      to: r.to_storage || r.to || "",
+      recipient: "",
+      operator: r.operator || "",
+      comments: r.comments || ""
+    }));
+
+    _logsAll = [...listInbound, ...listOutbound, ...listTransfer].sort((a,b)=>new Date(b.time) - new Date(a.time));
+    _logsLoadedOnce = true;
+    applyLogsFilter();
+  } catch(err){
+    console.error(err);
+    showNotification("加载日志失败","error");
+  } finally {
+    if(btn){ btn.classList.remove("disabled"); btn.innerHTML = oldHTML; }
   }
-
-  _logsAll = data || [];
-  _logsLoadedOnce = true;
-  applyLogsFilter();
-
-  if(btn){ btn.classList.remove("disabled"); btn.innerHTML=old; }
 }
 
 function applyLogsFilter(){
-  const type = document.getElementById("logs-type").value;
-  const q = normStr(document.getElementById("logs-search").value || "");
-  const startDate = document.getElementById("logs-date-start").value;
-  const endDate = document.getElementById("logs-date-end").value;
+  const typeSel = byId("logs-type").value;
+  const q = (byId("logs-search").value || "").trim().toLowerCase();
+  const startDate = byId("logs-date-start").value ? new Date(byId("logs-date-start").value) : null;
+  const endDate = byId("logs-date-end").value ? new Date(byId("logs-date-end").value) : null;
 
-  _logsFiltered = _logsAll.filter(row=>{
-    if(type !== "ALL" && row.type !== type) return false;
-    if(startDate && row.time < startDate) return false;
-    if(endDate && row.time > endDate + "T23:59:59") return false;
+  _logsFiltered = (_logsAll||[]).filter(r=>{
+    if(typeSel !== "ALL" && r.type !== typeSel) return false;
+    if(startDate && new Date(r.time) < startDate) return false;
+    if(endDate && new Date(r.time) > new Date(endDate.getTime() + 24*60*60*1000)) return false;
     if(q){
-      const combined = [row.model,row.name,row.storage,row.from,row.to,row.recipient,row.operator,row.comments].join("|");
-      if(!normStr(combined).includes(q)) return false;
+      const combo = `${r.model}|${r.name}|${r.storage}|${r.from}|${r.to}|${r.recipient}|${r.operator}|${r.comments}`.toLowerCase();
+      if(!combo.includes(q)) return false;
     }
     return true;
   });
-
-  renderLogsTable(_logsFiltered, q);
+  renderLogsTable();
 }
 
-function renderLogsTable(rows, keyword){
+function renderLogsTable(){
   const tb = byId("logs-table-body");
   const empty = byId("logs-empty");
   tb.innerHTML = "";
-
-  if(!rows || rows.length === 0){
+  if(!_logsFiltered || _logsFiltered.length===0){
     empty.classList.remove("hidden");
     return;
   }
   empty.classList.add("hidden");
-
-  rows.forEach(r=>{
+  _logsFiltered.forEach(r=>{
     tb.insertAdjacentHTML("beforeend",`
-      <tr>
+      <tr class="hover:bg-gray-50 text-sm">
         <td class="px-4 py-2">${formatLocalTime(r.time)}</td>
         <td class="px-4 py-2">${r.type}</td>
         <td class="px-4 py-2">${safe(r.model)}</td>
         <td class="px-4 py-2">${safe(r.name)}</td>
         <td class="px-4 py-2">${safe(r.unit)}</td>
-        <td class="px-4 py-2 text-right">${r.qty ?? r.quantity ?? 0}</td>
+        <td class="px-4 py-2 text-right">${safe(r.qty)}</td>
         <td class="px-4 py-2">${safe(r.storage)}</td>
         <td class="px-4 py-2">${safe(r.from)}</td>
         <td class="px-4 py-2">${safe(r.to)}</td>
         <td class="px-4 py-2">${safe(r.recipient)}</td>
         <td class="px-4 py-2">${safe(r.operator)}</td>
         <td class="px-4 py-2">${safe(r.comments)}</td>
-      </tr>
-    `);
+      </tr>`);
   });
 }
 
 function exportLogsCSV(){
-  const list = _logsFiltered || [];
-  if(!list.length){
-    showNotification("无日志可导出", "error");
+  if(!_logsFiltered || _logsFiltered.length===0){
+    showNotification(LANG==='en'?"No data to export":"暂无可导出数据","error");
     return;
   }
-
-  const header=["time","type","model","name","unit","qty","storage","from","to","recipient","operator","comments"];
-  const rows=[header];
-  list.forEach(r=>{
+  const header = ["time","type","model","name","unit","qty","storage","from","to","recipient","operator","comments"];
+  const rows = [header];
+  _logsFiltered.forEach(r=>{
     rows.push(header.map(k=>r[k]||""));
   });
-
   const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
-  const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url;
-  a.download=`logs_${Date.now()}.csv`;
+  const blob = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8;"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `logs_${Date.now()}.csv`;
   a.click();
-  URL.revokeObjectURL(url);
-
-  showNotification(T("done_export_logs",{n:list.length}));
+  URL.revokeObjectURL(a.href);
+  showNotification(T("done_export_logs",{n:_logsFiltered.length}));
 }
+</script>
 
 </script>
 
 </body>
 </html>
-
-
-
-
-
-
-
-
 
