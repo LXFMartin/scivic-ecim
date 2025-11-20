@@ -53,8 +53,8 @@
     th { white-space: nowrap !important; }
     th#th-model,
     th#logs-th-model {
-      min-width:90px;
-      max-width:110px;
+      min-width:50px;
+      max-width:100px;
     }
 
     table { table-layout:auto !important; width:100%; }
@@ -147,6 +147,7 @@
   <div class="mb-8 flex justify-center gap-2 border-b overflow-x-auto">
     <button id="inbound-tab"   class="tab-button active px-6 py-3 border-b-2 whitespace-nowrap" onclick="switchView('inbound')">入库管理</button>
     <button id="outbound-tab"  class="tab-button px-6 py-3 border-b-2 whitespace-nowrap" onclick="switchView('outbound')">出库管理</button>
+    <button id="return-tab"    class="tab-button px-6 py-3 border-b-2 whitespace-nowrap" onclick="switchView('return')">退库管理</button>
     <button id="transfer-tab"  class="tab-button px-6 py-3 border-b-2 whitespace-nowrap" onclick="switchView('transfer')">移库管理</button>
     <button id="overview-tab"  class="tab-button px-6 py-3 border-b-2 whitespace-nowrap" onclick="switchView('overview')">库存总览</button>
     <button id="logs-tab"      class="tab-button px-6 py-3 border-b-2 whitespace-nowrap" onclick="switchView('logs')">操作日志 Logs</button>
@@ -203,6 +204,23 @@
       <div id="outbound-result" class="space-y-4"></div>
     </section>
 
+    <!--退库管理 -->
+    <section id="return-view" class="hidden">
+      <div class="bg-white p-6 rounded-lg shadow mb-6">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex-1">
+            <h2 class="text-xl font-bold mb-2" id="return-title">退库管理 (Return)</h2>
+            <input id="return-search" class="w-full p-3 border rounded-lg"
+                   placeholder="输入 型号/名称/领用人 搜索出库记录..."/>
+          </div>
+          <!-- 如果想做“最近出库记录”按钮，可以后面再加 -->
+        </div>
+      </div>
+
+      <!-- 退库搜索结果区域 -->
+      <div id="return-result" class="space-y-4"></div>
+    </section>
+   
     <!-- 移库管理 -->
     <section id="transfer-view" class="hidden">
       <div class="bg-white p-6 rounded-lg shadow mb-6">
@@ -268,6 +286,7 @@
             <tbody id="inventory-table-body"></tbody>
           </table>
         </div>
+        <div id="overview-pager" class="mt-3 mb-3 text-center space-x-2"></div>
       </div>
     </section>
 
@@ -288,6 +307,7 @@
               <option value="INBOUND" id="logs-opt-in">入库 Inbound</option>
               <option value="OUTBOUND" id="logs-opt-out">出库 Outbound</option>
               <option value="TRANSFER" id="logs-opt-tr">移库 Transfer</option>
+              <option value="RETURN"   id="logs-opt-ret">退库 Return</option>
             </select>
           </div>
 
@@ -331,7 +351,8 @@
             </thead>
             <tbody id="logs-table-body"></tbody>
           </table>
-        </div>
+          </div>
+        <div id="logs-pager" class="mt-3 text-center space-x-2"></div>
         <div id="logs-empty" class="text-center text-gray-500 py-6 hidden">暂无日志</div>
       </div>
     </section>
@@ -378,10 +399,12 @@ const I18N = {
     tab_transfer:"移库管理",
     tab_overview:"库存总览",
     tab_logs:"操作日志 Logs",
+    tab_return:"退库管理",
     inbound_title:"入库管理 (Inbound)",
     outbound_title:"出库管理 (Outbound)",
     transfer_title:"移库管理 (Transfer)",
     overview_title:"库存总览 (Inventory Overview)",
+    return_title:"退库管理 (Return)",
     show_all:"显示全部",
     batch_import_title:"批量导入 CSV (Batch Import)",
     batch_import_hint:"表头：型号, 部件名称, 单位, 数量, 存放地点, 使用位置, 材质, 说明",
@@ -405,6 +428,7 @@ const I18N = {
     logs_opt_in:"入库 Inbound",
     logs_opt_out:"出库 Outbound",
     logs_opt_tr:"移库 Transfer",
+    logs_opt_ret:"退库 Return",
     logs_export:"导出 CSV",
     logs_refresh:"刷新",
     logs_empty:"暂无日志",
@@ -439,7 +463,9 @@ const I18N = {
     not_repeat_click:"请勿重复点击，5秒后可重试",
     inbound_here:"入库到此地点",
     outbound_confirm:"确认出库",
-    transfer_confirm:"执行移库"
+    transfer_confirm:"执行移库",
+    return_search_ph:"输入 型号/名称/领用人 搜索出库记录...",
+    return_confirm:"确认退库"
   },
   en: {
     app_title:"SCIVIC ECIM - Inventory Management System",
@@ -459,10 +485,12 @@ const I18N = {
     tab_transfer:"Transfer",
     tab_overview:"Overview",
     tab_logs:"Logs",
+    tab_return:"Return",
     inbound_title:"Inbound",
     outbound_title:"Outbound",
     transfer_title:"Transfer",
     overview_title:"Inventory Overview",
+    return_title:"Return",
     show_all:"Show all",
     batch_import_title:"Batch Import CSV",
     batch_import_hint:"Headers: Model, Name, Unit, Quantity, Storage, Location, Material, Comments",
@@ -486,6 +514,7 @@ const I18N = {
     logs_opt_in:"Inbound",
     logs_opt_out:"Outbound",
     logs_opt_tr:"Transfer",
+    logs_opt_ret:"Return",
     logs_export:"Export CSV",
     logs_refresh:"Refresh",
     logs_empty:"No records",
@@ -520,7 +549,9 @@ const I18N = {
     not_repeat_click:"Retry in 5s",
     inbound_here:"Inbound Here",
     outbound_confirm:"Confirm Outbound",
-    transfer_confirm:"Confirm Transfer"
+    transfer_confirm:"Confirm Transfer",
+    return_search_ph:"Search outbound logs by model / name / recipient...",
+    return_confirm:"Confirm Return"
   }
 };
 
@@ -576,11 +607,13 @@ function applyI18n(){
   byId("transfer-tab").textContent=T("tab_transfer");
   byId("overview-tab").textContent=T("tab_overview");
   byId("logs-tab").textContent=T("tab_logs");
+  byId("return-tab").textContent=T("tab_return");
 
   byId("inbound-title").textContent=T("inbound_title");
   byId("outbound-title").textContent=T("outbound_title");
   byId("transfer-title").textContent=T("transfer_title");
   byId("overview-title").textContent=T("overview_title");
+  byId("return-title").textContent=T("return_title");
 
   byId("btn-inbound-showall").textContent="👁️ "+T("show_all");
   byId("btn-outbound-showall").textContent="👁️ "+T("show_all");
@@ -592,6 +625,7 @@ function applyI18n(){
   byId("batch-transfer-hint").textContent=T("batch_transfer_hint");
 
   byId("overview-search").placeholder=T("overview_search_placeholder");
+  byId("return-search").placeholder=T("return_search_ph");
   byId("th-model").textContent=T("th_model");
   byId("th-name").textContent=T("th_name");
   byId("th-unit").textContent=T("th_unit");
@@ -611,6 +645,7 @@ function applyI18n(){
   byId("logs-opt-in").textContent=T("logs_opt_in");
   byId("logs-opt-out").textContent=T("logs_opt_out");
   byId("logs-opt-tr").textContent=T("logs_opt_tr");
+  byId("logs-opt-ret").textContent = T("logs_opt_ret");
   byId("btn-logs-export").textContent="⬇️ "+T("logs_export");
   byId("btn-logs-refresh").textContent="🔄 "+T("logs_refresh");
 
@@ -669,7 +704,7 @@ let CURRENT_EMAIL="";
 let AUTHORIZED=false;
 
 // 登录有效期：24 小时
-const LOGIN_TTL_MS = 12 * 60 * 60 * 1000;
+const LOGIN_TTL_MS = 24 * 60 * 60 * 1000;
 
 function setCurrentUser(email){
   CURRENT_EMAIL=email||"";
@@ -915,9 +950,10 @@ function filterPositiveStock(list){
   });
 }
 function findByTerm(term){
-  const q=normStr(term);
-  if(!q) return [];
-  return (masterItemList||[]).filter(i=>{
+  const q = normStr(term);
+  const base = masterItemList || [];
+  if(!q) return base;
+  return base.filter(i=>{
     const combined=[
       i.model,i.name,i.storage,i.location,i.material,i.comments
     ].join("|");
@@ -1011,7 +1047,7 @@ async function reloadOverview(silent=false){
 
 /* ========= ⑧ 视图切换 ========= */
 function switchView(view){
-  ["inbound","outbound","transfer","overview","logs"].forEach(v=>{
+  ["inbound","outbound","return","transfer","overview","logs"].forEach(v=>{
     const sec=byId(v+"-view");
     const tab=byId(v+"-tab");
     if(!sec||!tab) return;
@@ -1034,36 +1070,130 @@ function switchView(view){
 }
 
 /* ========= ⑨ 库存总览渲染 ========= */
-function renderInventoryTable(list=masterItemList, term=""){
-  const tb=byId("inventory-table-body");
-  if(!tb){
-    console.warn("table body #inventory-table-body 未找到");
+let _overviewPage = 1;
+const OVERVIEW_PER_PAGE = 100;  // 每页显示 100 条
+let _overviewFiltered = [];
+function renderInventoryTable(list = masterItemList, term = "") {
+  const tb = byId("inventory-table-body");
+  if (!tb) return;
+
+  // 搜索关键字（用于高亮）
+  const keyword = (term || "").trim().toLowerCase();
+
+  function highlight(text) {
+  if (!keyword) return safe(text || "");
+
+  const raw = text || "";
+
+  // 转为忽略空格/符号后的字符串
+  const normRaw = normStr(raw);
+  const normKey = normStr(keyword);
+
+  // 若标准化后不包含，则无需高亮
+  if (!normRaw.includes(normKey)) return safe(raw);
+
+  // 构造匹配正则：每个字符之间允许出现空格、-、_、/等
+  const pattern = new RegExp(
+    keyword
+      .split("")
+      .map(ch => {
+        const esc = ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return `${esc}[\\s.\\-_/\\\\_]*`;
+      })
+      .join(""),
+    "ig"
+  );
+
+  // 高亮显示
+  return raw.replace(
+    pattern,
+    m => `<mark>${m}</mark>`
+  );
+}
+
+
+  // 正常过滤（保留正库存）
+  const base = filterPositiveStock(list || []);
+
+  // 保存过滤结果，用于分页
+  _overviewFiltered = base;
+  const total = _overviewFiltered.length;
+
+  // 分页计算
+  const start = (_overviewPage - 1) * OVERVIEW_PER_PAGE;
+  const end = Math.min(start + OVERVIEW_PER_PAGE, total);
+  const pageRows = _overviewFiltered.slice(start, end);
+
+  // 清空表格
+  tb.innerHTML = "";
+
+  // 空状态
+  if (!pageRows.length) {
+    tb.innerHTML = `<tr><td colspan="8" class="py-6 text-center text-gray-500">
+      ${LANG === "en" ? "No inventory" : "暂无库存"}
+    </td></tr>`;
     return;
   }
-  tb.innerHTML="";
-  const filtered=filterPositiveStock(list||[]);
-  if(!filtered||filtered.length===0){
-    tb.innerHTML=`<tr><td colspan="8" class="text-center py-8 text-gray-500">${
-      LANG==='en'?'No inventory':'暂无库存'
-    }</td></tr>`;
-    return;
-  }
-  filtered.forEach(it=>{
-    const key=`${it.model}@@${it.storage||""}`;
-    const stock=Number(stockByKey[key]||0);
-    tb.insertAdjacentHTML("beforeend",`
+
+  // 渲染每一行
+  pageRows.forEach((it) => {
+    const key = `${it.model}@@${it.storage || ""}`;
+    const stock = Number(stockByKey[key] || 0);
+
+    tb.insertAdjacentHTML("beforeend", `
       <tr class="hover:bg-gray-50">
-        <td class="px-6 py-3 break-words whitespace-normal min-w-[100px] max-w-[250px]">${highlightMatch(it.model,term)}</td>
-        <td class="px-6 py-3 break-words whitespace-normal min-w-[100px] max-w-[250px]">${highlightMatch(it.name,term)}</td>
-        <td class="px-6 py-3">${safe(it.unit||"PCS")}</td>
-        <td class="px-6 py-3 font-semibold ${stock<0?'text-red-600':''}">${stock}</td>
-        <td class="px-6 py-3">${highlightMatch(it.storage,term)}</td>
-        <td class="px-6 py-3">${highlightMatch(it.location,term)}</td>
-        <td class="px-6 py-3">${highlightMatch(it.material,term)}</td>
-        <td class="px-6 py-3">${highlightMatch(it.comments,term)}</td>
+        <td class="px-6 py-3">${highlight(it.model)}</td>
+        <td class="px-6 py-3">${highlight(it.name)}</td>
+        <td class="px-6 py-3">${safe(it.unit || "PCS")}</td>
+        <td class="px-6 py-3 font-semibold ${stock < 0 ? "text-red-600" : ""}">${stock}</td>
+        <td class="px-6 py-3">${highlight(it.storage)}</td>
+        <td class="px-6 py-3">${highlight(it.location)}</td>
+        <td class="px-6 py-3">${highlight(it.material)}</td>
+        <td class="px-6 py-3">${highlight(it.comments)}</td>
       </tr>
     `);
   });
+
+  // 渲染分页按钮
+  renderOverviewPager(total);
+}
+
+function renderOverviewPager(total) {
+  const pager = byId("overview-pager");
+  if (!pager) return;
+
+  const pages = Math.ceil(total / OVERVIEW_PER_PAGE);
+  if (pages <= 1) {
+    pager.innerHTML = "";
+    return;
+  }
+
+  pager.innerHTML = `
+    <button onclick="changeOverviewPage(-1)" 
+      class="px-3 py-1 border rounded ${_overviewPage === 1 ? 'opacity-40' : ''}">
+      ⬅️ Prev
+    </button>
+
+    <span class="text-sm">
+      Page ${_overviewPage} / ${pages} （共 ${total} 条）
+    </span>
+
+    <button onclick="changeOverviewPage(1)" 
+      class="px-3 py-1 border rounded ${_overviewPage === pages ? 'opacity-40' : ''}">
+      Next ➡️
+    </button>
+  `;
+}
+
+function changeOverviewPage(delta) {
+  const total = _overviewFiltered.length;
+  const pages = Math.ceil(total / OVERVIEW_PER_PAGE);
+
+  const newPage = _overviewPage + delta;
+  if (newPage < 1 || newPage > pages) return;
+
+  _overviewPage = newPage;
+  renderInventoryTable(_overviewFiltered, byId("overview-search").value.trim().toLowerCase());
 }
 
 // 库存总览搜索框
@@ -1075,6 +1205,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   }
   overviewSearch.addEventListener("keyup",(e)=>{
     const raw=e.target.value||"";
+    _overviewPage = 1; 
     const results=findByTerm(raw);
     renderInventoryTable(results, raw);
   });
@@ -1085,16 +1216,13 @@ document.addEventListener("DOMContentLoaded",()=>{
 
 /* ========= ⑩ 导出库存 CSV ========= */
 function exportOverviewCSV(){
-  const term=(byId("overview-search").value||"").toLowerCase().trim();
-  const base=term
-    ? masterItemList.filter(i=>
-        (i.name||"").toLowerCase().includes(term) ||
-        (i.model||"").toLowerCase().includes(term)||
-        (i.storage||"").toLowerCase().includes(term)
-      )
-    : masterItemList;
+  const raw = (byId("overview-search").value||"");
+  // 与前端展示统一：使用 findByTerm + normStr 作为搜索内核
+  const base = raw.trim()
+    ? findByTerm(raw)
+    : (masterItemList || []);
 
-  const list=filterPositiveStock(base);
+  const list = filterPositiveStock(base);
   const rows=[["model","name","unit","total","storage","location","material","comments"]];
   list.forEach(it=>{
     const key=`${it.model}@@${it.storage||""}`;
@@ -1570,6 +1698,195 @@ async function handleOutbound(modelEnc,storageEnc,btn){
   }
 }
 
+/* ========= 13.1 退库管理（基于 logs_all 的 OUTBOUND 记录） ========= */
+
+const returnSearch = byId("return-search");
+const returnResult = byId("return-result");
+
+// 缓存当前退库列表，用下标索引给 handleReturn 用
+let _returnList = [];
+
+// 退库搜索：按 型号 / 名称 / 领用人 在 OUTBOUND 日志中模糊匹配（统一使用 normStr 模糊匹配，支持 rs→R S）
+returnSearch.addEventListener("keyup", async (e)=>{
+  const raw = e.target.value || "";
+  const norm = normStr(raw);
+
+  if(!norm){
+    returnResult.innerHTML = "";
+    _returnList = [];
+    return;
+  }
+
+  await loadReturnList(raw);
+});
+
+// 确保日志已加载（利用现有 reloadLogs / _logsCache）
+async function ensureLogsLoadedForReturn(){
+  if(_logsLoadedOnce) return;
+  await reloadLogs();      // 会从 logs_all 读最多 50000 条
+}
+
+// 从 _logsCache 中筛选 type = OUTBOUND 且匹配搜索词（统一 normStr 内核）
+async function loadReturnList(term){
+  await ensureLogsLoadedForReturn();
+
+  const normTerm = normStr(term);
+
+  const list = (_logsCache || []).filter(r=>{
+    if(r.type !== "OUTBOUND") return false;
+    const combined = [
+      r.model, r.name, r.storage,
+      r.recipient, r.operator, r.comments
+    ].join("|");
+    return normStr(combined).includes(normTerm);
+  });
+
+  renderReturnList(list, term);
+}
+
+function renderReturnList(list, term=""){
+  returnResult.innerHTML = "";
+  _returnList = list || [];
+
+  if(!_returnList.length){
+    returnResult.innerHTML = `<div class="text-gray-500">${
+      LANG==='en'
+        ? "No outbound record found"
+        : "未找到相关出库记录"
+    }</div>`;
+    return;
+  }
+
+  _returnList.forEach((r, idx)=>{
+    const key = `${r.model||""}@@${r.storage||""}`;
+    const stock = Number(stockByKey[key] || 0);
+    const timeStr = formatLocalTime(r.created_at);
+
+    returnResult.insertAdjacentHTML("beforeend",`
+      <div class="bg-white p-6 rounded-lg shadow mb-3">
+        <h3 class="text-lg font-bold mb-2">
+          ${highlightMatch(r.name||"", term)}
+          <span class="text-gray-500">
+            (${highlightMatch(r.model||"", term)})
+          </span>
+        </h3>
+
+        <div class="grid md:grid-cols-3 gap-2 text-sm">
+          <div><b>${LANG==='en'?'Unit':'单位'}:</b> ${safe(r.unit||"PCS")}</div>
+          <div><b>${LANG==='en'?'Outbound Qty':'出库数量'}:</b> ${safe(r.quantity)}</div>
+          <div><b>${LANG==='en'?'Current Stock':'当前库存'}:</b> ${stock}</div>
+          <div><b>${LANG==='en'?'Storage':'库位'}:</b> ${highlightMatch(r.storage||"", term)}</div>
+          <div><b>${LANG==='en'?'Recipient':'领用人'}:</b> ${highlightMatch(r.recipient||"", term)}</div>
+          <div><b>${LANG==='en'?'Time':'时间'}:</b> ${safe(timeStr)}</div>
+          <div class="md:col-span-3">
+            <b>${LANG==='en'?'Comments':'备注'}:</b> ${highlightMatch(r.comments||"", term)}
+          </div>
+        </div>
+
+        <div class="mt-3 flex flex-col md:flex-row md:items-center gap-3">
+          <input id="return-qty-${idx}" type="number" min="1" step="1"
+                 class="w-40 p-2 border rounded"
+                 placeholder="${LANG==='en'?'Return Qty':'退库数量'}"/>
+          <input id="return-comments-${idx}" class="w-80 p-2 border rounded"
+                 placeholder="${LANG==='en'?'Comments (optional)':'备注（可选）'}"/>
+          <button class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded w-full md:w-auto"
+                  onclick="handleReturn(${idx}, this)">
+            ${T("return_confirm")}
+          </button>
+        </div>
+      </div>
+    `);
+  });
+}
+
+// 退库确认：写入 returns + 更新 overview.total + 写入 logs_all(type='RETURN')
+async function handleReturn(idx, btn){
+  const row = _returnList[idx];
+  if(!row){
+    showNotification(LANG==='en'?"Record not found":"记录不存在","error");
+    return;
+  }
+
+  const model   = row.model || "";
+  const storage = row.storage || "";
+  const name    = row.name   || "";
+  const unit    = row.unit   || "PCS";
+  const recipient = row.recipient || "";
+
+  if(!acquireOpLock("return", `${model}@@${storage}@@${idx}`, 5000)){
+    showNotification(T("not_repeat_click"),"error");
+    return;
+  }
+  releaseBtnLater(btn);
+
+  if(!CURRENT_EMAIL){
+    showNotification(T("tip_need_login"),"error");
+    return;
+  }
+  if(!AUTHORIZED){
+    showNotification(T("tip_not_authorized"),"error");
+    return;
+  }
+
+  const qtyEl = byId(`return-qty-${idx}`);
+  const cmtEl = byId(`return-comments-${idx}`);
+
+  const qty = parseInt(qtyEl?.value || "", 10);
+  const comments = (cmtEl?.value || "").trim();
+
+  if(!qty || qty <= 0){
+    showNotification(T("tip_invalid_qty"),"error");
+    return;
+  }
+
+  // 尝试从 overview 元数据中拿 location / material
+  const base = masterItemList.find(i => i.model===model && (i.storage||"")===storage);
+
+  try{
+    const { data, error } = await supa.rpc("fn_return_tx", {
+      p_model: model,
+      p_storage: storage,
+      p_name: name,
+      p_qty: qty,
+      p_operator: CURRENT_EMAIL,
+      p_unit: unit,
+      p_location: base?.location || "",
+      p_material: base?.material || "",
+      p_comments: comments || "",
+      p_recipient: recipient || ""
+    });
+
+    if(error) throw new Error(error.message || "Return failed");
+
+    const key = `${model}@@${storage}`;
+    const nextTotal = data?.new_total ?? null;
+    if(nextTotal !== null){
+      stockByKey[key] = nextTotal;
+    }
+
+    // 清空输入框
+    if(qtyEl) qtyEl.value = "";
+    if(cmtEl) cmtEl.value = "";
+
+    showNotification(
+      (LANG==='en'
+        ? `Returned ${qty} to `
+        : `退库成功，数量 ${qty}，库位 `) + (storage || "(blank)"),
+      "success"
+    );
+
+    // 刷新库存总览 + 下次重新拉日志
+    renderInventoryTable();
+    _logsLoadedOnce = false;
+  }catch(e){
+    console.error("Return failed:", e);
+    showNotification(
+      (LANG==='en'?"Return failed: ":"退库失败：") + (e.message || e),
+      "error"
+    );
+  }
+}
+
 /* ========= 14. 移库 ========= */
 const transferSearch=byId("transfer-search");
 const transferResult=byId("transfer-result");
@@ -1945,207 +2262,246 @@ async function handleBatchTransfer(evt){
   });
 }
 
-/* ========= 17. 操作日志（log_all + 模糊搜索高亮版） ========= */
+/* ========= 17. 操作日志（直接读取 log_all，支持完整搜索 + 日期 + 类型过滤） ========= */
 let _logsCache = [];
+let _logsPage = 1;          // 当前页
+const LOGS_PER_PAGE = 100;  // 每页显示 100 条
+let _logsFiltered = [];
 let _logsLoadedOnce = false;
 
-// 读取 log_all 表
-async function reloadLogs() {
+async function reloadLogs(){
   const btn = byId("btn-logs-refresh");
   const oldHTML = btn ? btn.innerHTML : "";
-  if (btn) {
+  if(btn){
     btn.classList.add("disabled");
     btn.innerHTML = "⏳";
   }
 
   try {
-    let allLogs = [];
-    let from = 0;
-    const step = 1000; // 每次取1000条，防止Supabase限制
-    while (true) {
-      const { data, error } = await supa
-        .from("logs_all")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .range(from, from + step - 1);
+    // ✅ 按 V4.0 模式：从 logs_all 表直接读取完整日志
+    const { data, error } = await supa
+      .from("logs_all") //
+      .select("*")
+      .order("created_at", { ascending:false })
+      .range(0, 50000); // ✅ 防止默认最多 1000 条
 
-    if (error) throw error;
-      if (!data || data.length === 0) break;
+    if(error) throw error;
 
-      allLogs.push(...data);
-      if (data.length < step) break; // 最后一页
-
-      from += step;
-    }
-
-    console.log(`✅ 日志加载完成，共 ${allLogs.length} 条`);
-    _logsCache = allLogs;
+    _logsCache = data || [];
     _logsLoadedOnce = true;
     applyLogsFilter();
 
-  } catch (err) {
+  } catch(err){
     console.error("日志加载失败：", err);
     showNotification("日志加载失败：" + err.message, "error");
+    } finally {
+    // ⬅⬅⬅ 关键点：必须在 finally 恢复按钮
   }
 
-  if (btn) {
+  if(btn){
     btn.classList.remove("disabled");
     btn.innerHTML = oldHTML;
   }
 }
 
-// 筛选 + 搜索
-function applyLogsFilter() {
-  const type = (byId("logs-type").value || "ALL").toUpperCase();
-  const q = (byId("logs-search").value || "").toLowerCase().trim();
-  const start = byId("logs-date-start").value;
-  const end = byId("logs-date-end").value;
+function applyLogsFilter(){
+  const term = (byId("logs-search").value||"").trim().toLowerCase();
+  const type = byId("logs-type").value;
+  const d1   = byId("logs-date-start").value;
+  const d2   = byId("logs-date-end").value;
 
-  console.log("🧭 进入 applyLogsFilter");
-  console.log("类型:", type, "搜索:", q, "开始:", start, "结束:", end);
-  console.log("总记录数:", _logsCache.length);
+  _logsFiltered = _logsCache.filter(r=>{
+    if(type !== "ALL" && r.type !== type) return false;
 
-  let filtered = _logsCache.slice();
+    if(d1 && r.created_at < d1) return false;
+    if(d2 && r.created_at > (d2 + " 23:59:59")) return false;
 
-  // 类型过滤
-  if (type !== "ALL") {
-    filtered = filtered.filter(it => (it.type || "").toUpperCase().trim() === type);
-  }
+    if (term) {
+  const nTerm = normStr(term);  // ⭐ 标准化搜索词
 
-  // 日期范围过滤（字段 created_at）
-  if (start) {
-    const startTs = new Date(start + "T00:00:00Z").getTime();
-    filtered = filtered.filter(it => {
-      const t = new Date(it.created_at || "").getTime();
-      return !isNaN(t) && t >= startTs;
-    });
-  }
+  const combined = [
+    r.model, r.name, r.unit, r.quantity, r.storage,
+    r.from_storage, r.to_storage, r.recipient,
+    r.operator, r.comments
+  ].join("|");
 
-  if (end) {
-    const endTs = new Date(end + "T23:59:59Z").getTime();
-    filtered = filtered.filter(it => {
-      const t = new Date(it.created_at || "").getTime();
-      return !isNaN(t) && t <= endTs;
-    });
-  }
+  const nCombined = normStr(combined);   // ⭐ 标准化日志内容
 
-  // 模糊搜索（空值安全）
-  if (q) {
-    filtered = filtered.filter(it => {
-      const combined = [
-        it.model || "",
-        it.name || "",
-        it.storage || "",
-        it.from_storage || "",
-        it.to_storage || "",
-        it.recipient || "",
-        it.operator || "",
-        it.comments || ""
-      ].join(" ").toLowerCase();
-      return combined.includes(q);
-    });
-  }
-
-  console.log("筛选后记录数:", filtered.length);
-  window._logsFiltered = filtered;
-  renderLogsTable(filtered, q);
+  if (!nCombined.includes(nTerm)) return false;   // ⭐ 标准化后的模糊匹配
+}
+    return true;
+  });
+  _logsPage = 1; // ⭐ 每次筛选自动跳回第 1 页
+  renderLogsTable();
 }
 
-// 渲染日志表格（支持高亮）
-function renderLogsTable(rows, keyword = "") {
-  const tb = byId("logs-table-body");
-  const empty = byId("logs-empty");
-  tb.innerHTML = "";
+const logsSearch = byId("logs-search");
+if (logsSearch) {
+  logsSearch.addEventListener("keyup", () => {
+    _logsPage = 1;          // ⭐ 搜索时自动回到第一页
+    applyLogsFilter();
+  });
+}
 
-  if (!rows || rows.length === 0) {
+function renderLogsTable(){
+  const body = byId("logs-table-body");
+  const empty= byId("logs-empty");
+    // ⭐⭐ 搜索关键字高亮
+  const keyword = (byId("logs-search").value || "").trim().toLowerCase();
+
+  function highlight(text) {
+  if (!keyword) return safe(text || "");
+
+  const raw = text || "";
+
+  // 转为忽略空格/符号后的字符串
+  const normRaw = normStr(raw);
+  const normKey = normStr(keyword);
+
+  // 若标准化后不包含，则无需高亮
+  if (!normRaw.includes(normKey)) return safe(raw);
+
+  // 构造匹配正则：每个字符之间允许出现空格、-、_、/等
+  const pattern = new RegExp(
+    keyword
+      .split("")
+      .map(ch => {
+        const esc = ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return `${esc}[\\s.\\-_/\\\\_]*`;
+      })
+      .join(""),
+    "ig"
+  );
+
+  // 高亮显示
+  return raw.replace(
+    pattern,
+    m => `<mark>${m}</mark>`
+  );
+}
+  body.innerHTML = "";
+
+  if(!_logsFiltered.length){
     empty.classList.remove("hidden");
     return;
   }
   empty.classList.add("hidden");
 
-  // 高亮函数
-  const highlight = (text) => {
-    if (!keyword) return safe(text || "");
-    const esc = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`(${esc})`, "gi");
-    return safe(text || "").replace(pattern, '<mark class="bg-yellow-200 text-black">$1</mark>');
-  };
+  // ⭐ 分页计算
+  const total = _logsFiltered.length;
+  const start = (_logsPage - 1) * LOGS_PER_PAGE;
+  const end   = Math.min(start + LOGS_PER_PAGE, total);
 
-  rows.forEach(r => {
-    tb.insertAdjacentHTML("beforeend", `
-      <tr class="hover:bg-gray-50 text-sm">
-        <td class="px-4 py-2">${formatLocalTime(r.created_at)}</td>
-        <td class="px-4 py-2">${safe(r.type || "")}</td>
-        <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[80px] max-w-[250px]">${highlight(r.model)}</td>
-        <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[80px] max-w-[200px]">${highlight(r.name)}</td>
-        <td class="px-4 py-2">${safe(r.unit || "PCS")}</td>
-        <td class="px-4 py-2">${safe(r.quantity || r.qty || "")}</td>
-        <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[80px] max-w-[120px]">${highlight(r.storage)}</td>
-        <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[80px] max-w-[120px]">${highlight(r.from_storage)}</td>
-        <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[80px] max-w-[120px]">${highlight(r.to_storage)}</td>
-        <td class="px-4 py-2 text-sm break-words whitespace-normal min-w-[60px] max-w-[100px]">${highlight(r.recipient)}</td>
-        <td class="px-4 py-2">${highlight(r.operator)}</td>
-        <td class="px-4 py-2">${highlight(r.comments)}</td>
+  const pageRows = _logsFiltered.slice(start, end);
+
+  // ⭐ 渲染当前页
+  pageRows.forEach(r=>{
+    body.insertAdjacentHTML("beforeend",`
+      <tr class="hover:bg-gray-50">
+        <td>${formatLocalTime(r.created_at)}</td>
+        <td>${r.type||""}</td>
+        <td>${highlight(r.model)}</td>
+        <td>${highlight(r.name)}</td>
+        <td>${r.unit||""}</td>
+        <td>${r.quantity||""}</td>
+        <td>${highlight(r.storage)}</td>
+        <td>${highlight(r.from_storage)}</td>
+        <td>${highlight(r.to_storage)}</td>
+        <td>${highlight(r.recipient)}</td>
+        <td>${r.operator||""}</td>
+        <td>${r.comments||""}</td>
       </tr>
     `);
   });
+
+  renderLogsPager(total);   // ⭐ 分页按钮
 }
 
-// 输入实时搜索
-const logsSearch = document.getElementById("logs-search");
-if (logsSearch) logsSearch.addEventListener("keyup", () => applyLogsFilter());
+function renderLogsPager(total){
+  const pager = byId("logs-pager");
+  if(!pager) return;
 
-// 导出日志 CSV
-function exportLogsCSV() {
-  const rows = [
-    ["created_at","type","model","name","unit","quantity",
-     "storage","from_storage","to_storage","recipient","operator","comments"]
-  ];
-// ✅ 若有筛选结果优先导出筛选后的，否则导出全部
-  const dataToExport = (window._logsFiltered && window._logsFiltered.length)
-    ? window._logsFiltered
-    : _logsCache;
-  dataToExport.forEach(r => {
-    rows.push([
-      formatLocalTime(r.created_at),
-      r.type || "",
-      r.model || "",
-      r.name || "",
-      r.unit || "",
-      r.quantity || r.qty || "",
-      r.storage || "",
-      r.from_storage || "",
-      r.to_storage || "",
-      r.recipient || "",
-      r.operator || "",
-      r.comments || ""
-    ]);
-  });
+  const pages = Math.ceil(total / LOGS_PER_PAGE);
+  if(pages <= 1){
+    pager.innerHTML = "";
+    return;
+  }
 
-  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  pager.innerHTML = `
+    <button onclick="changeLogsPage(-1)" 
+            class="px-3 py-1 border rounded ${_logsPage===1?'opacity-40':''}">
+      ⬅️ Prev
+    </button>
+
+    <span class="text-sm">
+      Page ${_logsPage} / ${pages} （共 ${total} 条）
+    </span>
+
+    <button onclick="changeLogsPage(1)" 
+            class="px-3 py-1 border rounded ${_logsPage===pages?'opacity-40':''}">
+      Next ➡️
+    </button>
+  `;
+}
+
+function changeLogsPage(delta){
+  const pages = Math.ceil(_logsFiltered.length / LOGS_PER_PAGE);
+  const newPage = _logsPage + delta;
+
+  if(newPage < 1 || newPage > pages) return;
+
+  _logsPage = newPage;
+  renderLogsTable();
+}
+
+// 导出日志 CSV（当前筛选结果）
+function exportLogs(){
+  if(!_logsFiltered || _logsFiltered.length === 0){
+    showNotification(LANG==='en'?"No data to export":"无可导出的记录","warning");
+    return;
+  }
+
+  const rows = _logsFiltered.map(r => ({
+    time: formatLocalTime(r.created_at),
+    type: r.type || "",
+    model: r.model || "",
+    name: r.name || "",
+    unit: r.unit || "",
+    quantity: r.quantity || "",
+    storage: r.storage || "",
+    from_storage: r.from_storage || "",
+    to_storage: r.to_storage || "",
+    recipient: r.recipient || "",
+    operator: r.operator || "",
+    comments: r.comments || ""
+  }));
+
+ 
+   // ✅ 生成 CSV 内容
+  let csv = Papa.unparse(rows, { quotes: true });
+
+  // ✅ 在最前面加 UTF-8 BOM 防止 Excel 乱码
+  csv = "\ufeff" + csv;
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
+
   const a = document.createElement("a");
   a.href = url;
-  a.download = `operation_logs_${Date.now()}.csv`;
+  a.download = "operation_logs_export.csv";
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
-  showNotification(T("done_export_logs", { n: rows.length - 1 }));
+  // ✅ 导出成功提示
+  showNotification(`${LANG==='en'?'Exported':'已导出'} ${rows.length} ${LANG==='en'?'records':'条记录'}`, "success");
 }
+
+// ✅ 绑定按钮事件
+byId("btn-logs-export")?.addEventListener("click", exportLogs);
+
 </script>
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
